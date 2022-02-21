@@ -1,10 +1,15 @@
-include ':custom-detekt-rules'
-include ':core'
-include ':easy_opencv_lib'
+
 include ':FtcRobotController'
 include ':TeamCode'
-//include ':gui'
-project(':easy_opencv_lib').projectDir = new File(rootDir, 'easy_opencv_lib/')
+
+include ':easy_opencv_lib'
+project(':easy_opencv_lib').projectDir = new File(rootDir, 'easy_opencv_lib/easyopencv/')
+
+include ':core'
 project(':core').projectDir = new File(rootDir, 'road-runner-lib/core/')
+
+//include ':gui'
 //project(':gui').projectDir = new File(rootDir, 'road-runner-lib/gui/')
+
+include ':custom-detekt-rules'
 project(':custom-detekt-rules').projectDir = new File(rootDir, 'road-runner-lib/custom-detekt-rules/')
