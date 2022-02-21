@@ -19,6 +19,7 @@ import com.acmerobotics.roadrunner.trajectory.constraints.TrajectoryAcceleration
 import com.acmerobotics.roadrunner.trajectory.constraints.TrajectoryVelocityConstraint;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.lynx.LynxModule;
+import com.qualcomm.robotcore.exception.RobotCoreException;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
@@ -34,6 +35,7 @@ import org.firstinspires.ftc.teamcode.util.LynxModuleUtil;
 import org.firstinspires.ftc.teamcode.drive.virtual.DriveTrain;
 import org.firstinspires.ftc.teamcode.drive.virtual.VirtualLocalizer;
 import org.firstinspires.ftc.teamcode.drive.virtual.VirtualMotorEx;
+import org.firstinspires.ftc.teamcode.drive.virtual.VirtualVoltageSensor;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import org.firstinspires.ftc.teamcode.util.RobotLogger;
 import org.firstinspires.ftc.teamcode.util.SafeSleep;
@@ -83,6 +85,8 @@ public class SampleMecanumDrive extends MecanumDrive {
     private VoltageSensor batteryVoltageSensor;
 
     // added for drive simulator
+    private VirtualVoltageSensor virtualVoltageSensor;
+
     private String TAG = "SampleMecanumDrive";
 	private List<Pose2d> poseHistory;
     private DriveTrain _virtualDriveTrain;
@@ -102,61 +106,68 @@ public class SampleMecanumDrive extends MecanumDrive {
         poseHistory = new ArrayList<>();
         RobotLogger.dd(TAG, "Mecanum drive is created");
         if (!DriveConstants.VirtualizeDrive) {
-            LynxModuleUtil.ensureMinimumFirmwareVersion(hardwareMap);
+        LynxModuleUtil.ensureMinimumFirmwareVersion(hardwareMap);
 
-            batteryVoltageSensor = hardwareMap.voltageSensor.iterator().next();
 
-            for (LynxModule module : hardwareMap.getAll(LynxModule.class)) {
-                module.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO);
+        for (LynxModule module : hardwareMap.getAll(LynxModule.class)) {
+            module.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO);
+        }
+        batteryVoltageSensor = hardwareMap.voltageSensor.iterator().next();
+
+        // TODO: adjust the names of the following hardware devices to match your configuration
+        imu = hardwareMap.get(BNO055IMU.class, "imu");
+        BNO055IMU.Parameters parameters = new BNO055IMU.Parameters();
+        parameters.angleUnit = BNO055IMU.AngleUnit.RADIANS;
+        imu.initialize(parameters);
+
+        // TODO: If the hub containing the IMU you are using is mounted so that the "REV" logo does
+        // not face up, remap the IMU axes so that the z-axis points upward (normal to the floor.)
+        //
+        //             | +Z axis
+        //             |
+        //             |
+        //             |
+        //      _______|_____________     +Y axis
+        //     /       |_____________/|__________
+        //    /   REV / EXPANSION   //
+        //   /       / HUB         //
+        //  /_______/_____________//
+        // |_______/_____________|/
+        //        /
+        //       / +X axis
+        //
+        // This diagram is derived from the axes in section 3.4 https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bno055-ds000.pdf
+        // and the placement of the dot/orientation from https://docs.revrobotics.com/rev-control-system/control-system-overview/dimensions#imu-location
+        //
+        // For example, if +Y in this diagram faces downwards, you would use AxisDirection.NEG_Y.
+        // BNO055IMUUtil.remapZAxis(imu, AxisDirection.NEG_Y);
+
+        leftFront = hardwareMap.get(DcMotorEx.class, "leftFront");
+        leftRear = hardwareMap.get(DcMotorEx.class, "leftRear");
+        rightRear = hardwareMap.get(DcMotorEx.class, "rightRear");
+        rightFront = hardwareMap.get(DcMotorEx.class, "rightFront");
+
+        motors = Arrays.asList(leftFront, leftRear, rightRear, rightFront);
+        }
+        else {
+            try {
+                virtualVoltageSensor = new VirtualVoltageSensor();
+            } catch (RobotCoreException e) {
+                e.printStackTrace();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
-
-            // TODO: adjust the names of the following hardware devices to match your configuration
-            imu = hardwareMap.get(BNO055IMU.class, "imu");
-            BNO055IMU.Parameters parameters = new BNO055IMU.Parameters();
-            parameters.angleUnit = BNO055IMU.AngleUnit.RADIANS;
-            imu.initialize(parameters);
-
-            // TODO: If the hub containing the IMU you are using is mounted so that the "REV" logo does
-            // not face up, remap the IMU axes so that the z-axis points upward (normal to the floor.)
-            //
-            //             | +Z axis
-            //             |
-            //             |
-            //             |
-            //      _______|_____________     +Y axis
-            //     /       |_____________/|__________
-            //    /   REV / EXPANSION   //
-            //   /       / HUB         //
-            //  /_______/_____________//
-            // |_______/_____________|/
-            //        /
-            //       / +X axis
-            //
-            // This diagram is derived from the axes in section 3.4 https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bno055-ds000.pdf
-            // and the placement of the dot/orientation from https://docs.revrobotics.com/rev-control-system/control-system-overview/dimensions#imu-location
-            //
-            // For example, if +Y in this diagram faces downwards, you would use AxisDirection.NEG_Y.
-            // BNO055IMUUtil.remapZAxis(imu, AxisDirection.NEG_Y);
-
-            leftFront = hardwareMap.get(DcMotorEx.class, "leftFront");
-            leftRear = hardwareMap.get(DcMotorEx.class, "leftRear");
-            rightRear = hardwareMap.get(DcMotorEx.class, "rightRear");
-            rightFront = hardwareMap.get(DcMotorEx.class, "rightFront");
-
+            leftFront = new VirtualMotorEx(this, "leftFront");
+            leftRear = new VirtualMotorEx(this, "leftRear");
+            rightRear = new VirtualMotorEx(this, "rightRear");
+            rightFront = new VirtualMotorEx(this, "rightFront");
             motors = Arrays.asList(leftFront, leftRear, rightRear, rightFront);
-            }
-            else {
-                leftFront = new VirtualMotorEx(this, "leftFront");
-                leftRear = new VirtualMotorEx(this, "leftRear");
-                rightRear = new VirtualMotorEx(this, "rightRear");
-                rightFront = new VirtualMotorEx(this, "rightFront");
-                motors = Arrays.asList(leftFront, leftRear, rightRear, rightFront);
-                _virtualDriveTrain = new DriveTrain(this);
-                _virtualDriveTrain.AddMotors(motors);
-                //setLocalizer(new VirtualLocalizer(_virtualDriveTrain));
-                setLocalizer(new MecanumLocalizer(this, false));
-                RobotLogger.dd(TAG, "use default 4 wheel localizer");
-            }
+            _virtualDriveTrain = new DriveTrain(this);
+            _virtualDriveTrain.AddMotors(motors);
+            //setLocalizer(new VirtualLocalizer(_virtualDriveTrain));
+            setLocalizer(new MecanumLocalizer(this, false));
+            RobotLogger.dd(TAG, "use default 4 wheel localizer");
+        }
         for (DcMotorEx motor : motors) {
             MotorConfigurationType motorConfigurationType = motor.getMotorType().clone();
             motorConfigurationType.setAchieveableMaxRPMFraction(1.0);
@@ -270,10 +281,20 @@ public class SampleMecanumDrive extends MecanumDrive {
     }
 
     public void setPIDFCoefficients(DcMotor.RunMode runMode, PIDFCoefficients coefficients) {
-        PIDFCoefficients compensatedCoefficients = new PIDFCoefficients(
-                coefficients.p, coefficients.i, coefficients.d,
-                coefficients.f * 12 / batteryVoltageSensor.getVoltage()
-        );
+        PIDFCoefficients compensatedCoefficients;
+        if (!DriveConstants.VirtualizeDrive) {
+            compensatedCoefficients = new PIDFCoefficients(
+                    coefficients.p, coefficients.i, coefficients.d,
+                    coefficients.f * 12 / batteryVoltageSensor.getVoltage()
+            );
+        }
+        else {
+            compensatedCoefficients = new PIDFCoefficients(
+                    coefficients.p, coefficients.i, coefficients.d,
+                    coefficients.f * 12 / virtualVoltageSensor.getVoltage()
+            );
+        }
+
 
         for (DcMotorEx motor : motors) {
             motor.setPIDFCoefficients(runMode, compensatedCoefficients);
@@ -326,19 +347,19 @@ public class SampleMecanumDrive extends MecanumDrive {
 
         leftFront.setPower(v);
         if (DriveConstants.VirtualizeDrive) {  // simulate latency in I/O operation
-            SafeSleep.sleep_milliseconds(opMode, 2);
+            //SafeSleep.sleep_milliseconds(opMode, 2);
         }
         leftRear.setPower(v1);
         if (DriveConstants.VirtualizeDrive) {
-            SafeSleep.sleep_milliseconds(opMode, 2);
+            //SafeSleep.sleep_milliseconds(opMode, 2);
         }
         rightRear.setPower(v2);
         if (DriveConstants.VirtualizeDrive) {
-            SafeSleep.sleep_milliseconds(opMode, 2);
+            //SafeSleep.sleep_milliseconds(opMode, 2);
         }
         rightFront.setPower(v3);
         if (DriveConstants.VirtualizeDrive) {
-            SafeSleep.sleep_milliseconds(opMode, 2);
+            //SafeSleep.sleep_milliseconds(opMode, 2);
         }
     }
 

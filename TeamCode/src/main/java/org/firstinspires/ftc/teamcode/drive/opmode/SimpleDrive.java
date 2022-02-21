@@ -24,7 +24,7 @@ import java.util.List;
  */
 @Config
 @Autonomous(group = "drive")
-@Disabled
+//@Disabled
 public class SimpleDrive extends LinearOpMode {
     private String TAG = "SimpleDrive";
 
@@ -43,6 +43,7 @@ public class SimpleDrive extends LinearOpMode {
             drive.setMotorPowers(0.0, 0.0, 0.8, 0.8);
 
             List<Double> wheelPositions = drive.getWheelPositions();
+
 
             currentPose = drive.getPoseEstimate();
             currentX = -currentPose.getY();
