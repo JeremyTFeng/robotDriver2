@@ -16,7 +16,31 @@ import com.qualcomm.robotcore.hardware.PIDFCoefficients;
  */
 @Config
 public class DriveConstants {
-
+    public static boolean ENABLE_LOGGING = true;
+    public static boolean VirtualizeDrive = true;
+    public static double odoTicksPerRevRight = 8114.5280;
+    public static double odoTicksPerRevLeft = 8133.0806;
+    public static double odoTicksPerRevHorizontal = 8104.8806;
+    public static double odoEncoderTicksPerRev = 1565.0;
+    public static double odoWheelRadius = 1.1811;
+    public static double WHEEL_BASE = 16;   //???
+    public static double txP = 10; //translational x/y co-efficients
+    public static double txI = 0;
+    public static double txD = 0;
+    public static double tyP = 10;
+    public static double tyI = 0;
+    public static double tyD = 0;
+    public static double hP =  20;    // heading co-efficients;
+    public static double hI =  0;
+    public static double hD =  0;
+    public static double kP = 1.72;
+    public static double kI = 0.172;
+    public static double kD = 0.0;
+    public static double ODOMETRY_TRACK_WIDTH = 14.632;
+    public static double ODOMETRY_HORIZONTAL_TRACK_WIDTH = -4.4;
+    public static double HARDCODED_TICKS_PER_REV = 16551/(96) * Math.PI  * 80/60; //MOTOR_CONFIG.getTicksPerRev();
+    public static double MAX_RPM_FROM_SPEC = 340.0;
+    public static double HARDCODED_RPM_RATIO = 0.8; //0.72215; // 0.666;///0.6514;//*MAX_RPM_FROM_SPEC; //283.4; //MOTOR_CONFIG.getMaxRPM();
     /*
      * These are motor constants that should be listed online for your motors.
      */

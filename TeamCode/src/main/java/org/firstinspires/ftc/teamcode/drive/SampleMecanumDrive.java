@@ -29,8 +29,15 @@ import com.qualcomm.robotcore.hardware.configuration.typecontainers.MotorConfigu
 import org.firstinspires.ftc.teamcode.trajectorysequence.TrajectorySequence;
 import org.firstinspires.ftc.teamcode.trajectorysequence.TrajectorySequenceBuilder;
 import org.firstinspires.ftc.teamcode.trajectorysequence.TrajectorySequenceRunner;
-import org.firstinspires.ftc.teamcode.util.LynxModuleUtil;
 
+import org.firstinspires.ftc.teamcode.util.LynxModuleUtil;
+import org.firstinspires.ftc.teamcode.drive.virtual.DriveTrain;
+import org.firstinspires.ftc.teamcode.drive.virtual.VirtualLocalizer;
+import org.firstinspires.ftc.teamcode.drive.virtual.VirtualMotorEx;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import org.firstinspires.ftc.teamcode.util.RobotLogger;
+import org.firstinspires.ftc.teamcode.util.SafeSleep;
+import org.firstinspires.ftc.teamcode.util.DashboardUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -55,6 +62,7 @@ public class SampleMecanumDrive extends MecanumDrive {
     public static PIDCoefficients TRANSLATIONAL_PID = new PIDCoefficients(0, 0, 0);
     public static PIDCoefficients HEADING_PID = new PIDCoefficients(0, 0, 0);
 
+
     public static double LATERAL_MULTIPLIER = 1;
 
     public static double VX_WEIGHT = 1;
@@ -74,55 +82,81 @@ public class SampleMecanumDrive extends MecanumDrive {
     private BNO055IMU imu;
     private VoltageSensor batteryVoltageSensor;
 
+    // added for drive simulator
+    private String TAG = "SampleMecanumDrive";
+	private List<Pose2d> poseHistory;
+    private DriveTrain _virtualDriveTrain;
+    private Pose2d lastPoseOnTurn;
+    private LinearOpMode opMode;
+    public void setOpmode(LinearOpMode mode) {
+        opMode = mode;
+    }
+    // end 
+    
     public SampleMecanumDrive(HardwareMap hardwareMap) {
         super(kV, kA, kStatic, TRACK_WIDTH, TRACK_WIDTH, LATERAL_MULTIPLIER);
 
         follower = new HolonomicPIDVAFollower(TRANSLATIONAL_PID, TRANSLATIONAL_PID, HEADING_PID,
                 new Pose2d(0.5, 0.5, Math.toRadians(5.0)), 0.5);
+        // simu
+        poseHistory = new ArrayList<>();
+        RobotLogger.dd(TAG, "Mecanum drive is created");
+        if (!DriveConstants.VirtualizeDrive) {
+            LynxModuleUtil.ensureMinimumFirmwareVersion(hardwareMap);
 
-        LynxModuleUtil.ensureMinimumFirmwareVersion(hardwareMap);
+            batteryVoltageSensor = hardwareMap.voltageSensor.iterator().next();
 
-        batteryVoltageSensor = hardwareMap.voltageSensor.iterator().next();
+            for (LynxModule module : hardwareMap.getAll(LynxModule.class)) {
+                module.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO);
+            }
 
-        for (LynxModule module : hardwareMap.getAll(LynxModule.class)) {
-            module.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO);
-        }
+            // TODO: adjust the names of the following hardware devices to match your configuration
+            imu = hardwareMap.get(BNO055IMU.class, "imu");
+            BNO055IMU.Parameters parameters = new BNO055IMU.Parameters();
+            parameters.angleUnit = BNO055IMU.AngleUnit.RADIANS;
+            imu.initialize(parameters);
 
-        // TODO: adjust the names of the following hardware devices to match your configuration
-        imu = hardwareMap.get(BNO055IMU.class, "imu");
-        BNO055IMU.Parameters parameters = new BNO055IMU.Parameters();
-        parameters.angleUnit = BNO055IMU.AngleUnit.RADIANS;
-        imu.initialize(parameters);
+            // TODO: If the hub containing the IMU you are using is mounted so that the "REV" logo does
+            // not face up, remap the IMU axes so that the z-axis points upward (normal to the floor.)
+            //
+            //             | +Z axis
+            //             |
+            //             |
+            //             |
+            //      _______|_____________     +Y axis
+            //     /       |_____________/|__________
+            //    /   REV / EXPANSION   //
+            //   /       / HUB         //
+            //  /_______/_____________//
+            // |_______/_____________|/
+            //        /
+            //       / +X axis
+            //
+            // This diagram is derived from the axes in section 3.4 https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bno055-ds000.pdf
+            // and the placement of the dot/orientation from https://docs.revrobotics.com/rev-control-system/control-system-overview/dimensions#imu-location
+            //
+            // For example, if +Y in this diagram faces downwards, you would use AxisDirection.NEG_Y.
+            // BNO055IMUUtil.remapZAxis(imu, AxisDirection.NEG_Y);
 
-        // TODO: If the hub containing the IMU you are using is mounted so that the "REV" logo does
-        // not face up, remap the IMU axes so that the z-axis points upward (normal to the floor.)
-        //
-        //             | +Z axis
-        //             |
-        //             |
-        //             |
-        //      _______|_____________     +Y axis
-        //     /       |_____________/|__________
-        //    /   REV / EXPANSION   //
-        //   /       / HUB         //
-        //  /_______/_____________//
-        // |_______/_____________|/
-        //        /
-        //       / +X axis
-        //
-        // This diagram is derived from the axes in section 3.4 https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bno055-ds000.pdf
-        // and the placement of the dot/orientation from https://docs.revrobotics.com/rev-control-system/control-system-overview/dimensions#imu-location
-        //
-        // For example, if +Y in this diagram faces downwards, you would use AxisDirection.NEG_Y.
-        // BNO055IMUUtil.remapZAxis(imu, AxisDirection.NEG_Y);
+            leftFront = hardwareMap.get(DcMotorEx.class, "leftFront");
+            leftRear = hardwareMap.get(DcMotorEx.class, "leftRear");
+            rightRear = hardwareMap.get(DcMotorEx.class, "rightRear");
+            rightFront = hardwareMap.get(DcMotorEx.class, "rightFront");
 
-        leftFront = hardwareMap.get(DcMotorEx.class, "leftFront");
-        leftRear = hardwareMap.get(DcMotorEx.class, "leftRear");
-        rightRear = hardwareMap.get(DcMotorEx.class, "rightRear");
-        rightFront = hardwareMap.get(DcMotorEx.class, "rightFront");
-
-        motors = Arrays.asList(leftFront, leftRear, rightRear, rightFront);
-
+            motors = Arrays.asList(leftFront, leftRear, rightRear, rightFront);
+            }
+            else {
+                leftFront = new VirtualMotorEx(this, "leftFront");
+                leftRear = new VirtualMotorEx(this, "leftRear");
+                rightRear = new VirtualMotorEx(this, "rightRear");
+                rightFront = new VirtualMotorEx(this, "rightFront");
+                motors = Arrays.asList(leftFront, leftRear, rightRear, rightFront);
+                _virtualDriveTrain = new DriveTrain(this);
+                _virtualDriveTrain.AddMotors(motors);
+                //setLocalizer(new VirtualLocalizer(_virtualDriveTrain));
+                setLocalizer(new MecanumLocalizer(this, false));
+                RobotLogger.dd(TAG, "use default 4 wheel localizer");
+            }
         for (DcMotorEx motor : motors) {
             MotorConfigurationType motorConfigurationType = motor.getMotorType().clone();
             motorConfigurationType.setAchieveableMaxRPMFraction(1.0);
@@ -168,6 +202,7 @@ public class SampleMecanumDrive extends MecanumDrive {
     }
 
     public void turnAsync(double angle) {
+    	RobotLogger.dd(TAG, "turn: angle "+Double.toString(angle));
         trajectorySequenceRunner.followTrajectorySequenceAsync(
                 trajectorySequenceBuilder(getPoseEstimate())
                         .turn(angle)
@@ -207,6 +242,7 @@ public class SampleMecanumDrive extends MecanumDrive {
     }
 
     public void update() {
+        RobotLogger.dd(TAG, "roadrunner control loop starts");
         updatePoseEstimate();
         DriveSignal signal = trajectorySequenceRunner.update(getPoseEstimate(), getPoseVelocity());
         if (signal != null) setDriveSignal(signal);
@@ -277,6 +313,7 @@ public class SampleMecanumDrive extends MecanumDrive {
     @Override
     public List<Double> getWheelVelocities() {
         List<Double> wheelVelocities = new ArrayList<>();
+        RobotLogger.dd(TAG, "getWheelVelocities");
         for (DcMotorEx motor : motors) {
             wheelVelocities.add(encoderTicksToInches(motor.getVelocity()));
         }
@@ -285,17 +322,93 @@ public class SampleMecanumDrive extends MecanumDrive {
 
     @Override
     public void setMotorPowers(double v, double v1, double v2, double v3) {
+        RobotLogger.dd(TAG,"setMotorPowers");
+
         leftFront.setPower(v);
+        if (DriveConstants.VirtualizeDrive) {  // simulate latency in I/O operation
+            SafeSleep.sleep_milliseconds(opMode, 2);
+        }
         leftRear.setPower(v1);
+        if (DriveConstants.VirtualizeDrive) {
+            SafeSleep.sleep_milliseconds(opMode, 2);
+        }
         rightRear.setPower(v2);
+        if (DriveConstants.VirtualizeDrive) {
+            SafeSleep.sleep_milliseconds(opMode, 2);
+        }
         rightFront.setPower(v3);
+        if (DriveConstants.VirtualizeDrive) {
+            SafeSleep.sleep_milliseconds(opMode, 2);
+        }
     }
 
     @Override
     public double getRawExternalHeading() {
-        return imu.getAngularOrientation().firstAngle;
+        RobotLogger.callers(4, TAG, "getRawExternalHeading");
+        if (!DriveConstants.VirtualizeDrive) {
+            return imu.getAngularOrientation().firstAngle;
+        } else {
+            Pose2d pose = _virtualDriveTrain.getRobotPose();
+            RobotLogger.dd(TAG, "Simulated Pose (IMU ExternalHeading): " + pose.toString());
+            return pose.getHeading();
+        }
     }
+    public void print_list_double(List<Double> list){
+        //motors = Arrays.asList(leftFront, leftRear, rightRear, rightFront);
+        int wheel_num = list.size();
+        if (wheel_num == 4) {
+            for (int i = 0; i < list.size(); i++) {
+                String wheel_name = "";
+                if (i == 0)
+                    wheel_name = "leftFront";
+                else if (i == 1)
+                    wheel_name = "leftRear";
+                else if (i == 2)
+                    wheel_name = "rightRear";
+                else if (i == 3)
+                    wheel_name = "rightFront";
+                else
+                    wheel_name = "unexpected wheel name";
 
+                RobotLogger.dd(TAG, wheel_name + "  " + Double.toString(list.get(i)));
+            }
+        } else if (wheel_num == 3)
+        {
+            for (int i = 0; i < list.size(); i++) {
+                String wheel_name = "";
+                if (i == 0)
+                    wheel_name = "leftOdom";
+                else if (i == 1)
+                    wheel_name = "rightOdom";
+                else if (i == 2)
+                    wheel_name = "frontOdom";
+
+                RobotLogger.dd(TAG, wheel_name + "  " + Double.toString(list.get(i)));
+            }
+        }
+        else
+        {
+            for (int i = 0; i < list.size(); i++) {
+                String wheel_name = "";
+                RobotLogger.dd(TAG, wheel_name + "  " + Double.toString(list.get(i)));
+            }
+        }
+    }
+    public List<DcMotorEx> getMotors() {
+        return motors;
+    }
+    public List<Double> getOdomWheelPositions() {
+        RobotLogger.dd(TAG, "getOdomWheelPositions");
+        List<Double> wheelPositions = new ArrayList<>();
+        List<DcMotorEx> motors = _virtualDriveTrain.getOdomMotors();
+        for (DcMotorEx motor : motors) {
+            int pos = motor.getCurrentPosition();
+            double t = StandardTrackingWheelLocalizer.encoderTicksToInches(pos);
+            RobotLogger.dd(TAG, "getOdomWheelPositions, motor position(ticks): " + pos + "  ticks to inches: " + t);
+            wheelPositions.add(t);
+        }
+        return wheelPositions;
+    }
     @Override
     public Double getExternalHeadingVelocity() {
         // To work around an SDK bug, use -zRotationRate in place of xRotationRate

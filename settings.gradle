@@ -2,8 +2,8 @@
 include ':FtcRobotController'
 include ':TeamCode'
 
-include ':easy_opencv_lib'
-project(':easy_opencv_lib').projectDir = new File(rootDir, 'easy_opencv_lib/easyopencv/')
+//include ':easy_opencv_lib'
+//project(':easy_opencv_lib').projectDir = new File(rootDir, 'easy_opencv_lib/easyopencv/')
 
 include ':core'
 project(':core').projectDir = new File(rootDir, 'road-runner-lib/core/')
