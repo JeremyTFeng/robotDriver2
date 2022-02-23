@@ -45,6 +45,7 @@ import android.hardware.usb.UsbManager;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.SystemClock;
 import android.preference.PreferenceManager;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -429,8 +430,11 @@ public class FtcRobotControllerActivity extends Activity
   @Override
   protected void onStart() {
     super.onStart();
-    RobotLog.vv(TAG, "onStart()");
-
+    RobotLog.vv(TAG, "onStart() toggle WIFI?");
+    //WifiManager wifi = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+    //wifi.setWifiEnabled(false);
+    //SystemClock.sleep(1000);
+    //wifi.setWifiEnabled(true);
     entireScreenLayout.setOnTouchListener(new View.OnTouchListener() {
       @Override
       public boolean onTouch(View v, MotionEvent event) {

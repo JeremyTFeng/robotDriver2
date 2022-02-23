@@ -1,4 +1,5 @@
 repositories {
+    //mavenLocal()
     mavenCentral()
     google() // Needed for androidx
     jcenter()  // Needed for tensorflow-lite
@@ -21,6 +22,9 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.2.0'
     implementation 'org.firstinspires.ftc:gameAssets-FreightFrenzy:1.0.0'
 
-    implementation 'com.acmerobotics.dashboard:dashboard:0.4.4'
+    // FtcDashboard and dependencies
+    implementation files('../libs/FtcDashboard-release.aar')
+    implementation 'androidx.annotation:annotation:1.1.0'
+    implementation('org.nanohttpd:nanohttpd-websocket:2.3.1') {exclude module: 'nanohttpd'}
 }
 
