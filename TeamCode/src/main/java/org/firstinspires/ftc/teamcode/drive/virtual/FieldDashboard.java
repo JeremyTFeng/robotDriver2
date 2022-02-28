@@ -27,6 +27,7 @@ public class FieldDashboard {
     }
 
     public void updateDashboard() {
+        RobotLogger.dd(TAG, "updateDashboard");
         TelemetryPacket packet = new TelemetryPacket();
         Canvas fieldOverlay = packet.fieldOverlay();
         Pose2d currentPose = _drive.getPoseEstimate();

@@ -30,7 +30,17 @@ import org.firstinspires.ftc.teamcode.trajectorysequence.TrajectorySequence;
 import org.firstinspires.ftc.teamcode.trajectorysequence.TrajectorySequenceBuilder;
 import org.firstinspires.ftc.teamcode.trajectorysequence.TrajectorySequenceRunner;
 import org.firstinspires.ftc.teamcode.util.LynxModuleUtil;
+import org.firstinspires.ftc.teamcode.drive.virtual.DriveTrain;
+import org.firstinspires.ftc.teamcode.drive.virtual.VirtualLocalizer;
+import org.firstinspires.ftc.teamcode.drive.virtual.VirtualMotorEx;
+import org.firstinspires.ftc.teamcode.drive.virtual.VirtualVoltageSensor;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import org.firstinspires.ftc.teamcode.util.RobotLogger;
+import org.firstinspires.ftc.teamcode.util.SafeSleep;
+import org.firstinspires.ftc.teamcode.util.DashboardUtil;
+import com.qualcomm.robotcore.exception.RobotCoreException;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -69,12 +79,36 @@ public class SampleTankDrive extends TankDrive {
     private BNO055IMU imu;
 
     private VoltageSensor batteryVoltageSensor;
+    
+    // added for drive simulator
+    private VirtualVoltageSensor virtualVoltageSensor;
+
+    private String TAG = "SampleTankDrive";
+	private List<Pose2d> poseHistory;
+    private DriveTrain _virtualDriveTrain;
+    private Pose2d lastPoseOnTurn;
+    private LinearOpMode opMode;
+    public void setOpmode(LinearOpMode mode) {
+        this.opMode = mode;
+    }
+    private DcMotorEx leftFront, leftRear, rightRear, rightFront;
+
+    // end 
+	public SampleTankDrive(HardwareMap hardwareMap, LinearOpMode opmode) {
+        this(hardwareMap);
+        this.setOpmode(opmode);
+    }
 
     public SampleTankDrive(HardwareMap hardwareMap) {
         super(kV, kA, kStatic, TRACK_WIDTH);
 
         follower = new TankPIDVAFollower(AXIAL_PID, CROSS_TRACK_PID,
                 new Pose2d(0.5, 0.5, Math.toRadians(5.0)), 0.5);
+        
+        // simulator 
+        poseHistory = new ArrayList<>();
+        RobotLogger.dd(TAG, "Mecanum drive is created");
+        if (!DriveConstants.VirtualizeDrive) {
 
         LynxModuleUtil.ensureMinimumFirmwareVersion(hardwareMap);
 
@@ -121,7 +155,28 @@ public class SampleTankDrive extends TankDrive {
         motors = Arrays.asList(leftFront, leftRear, rightRear, rightFront);
         leftMotors = Arrays.asList(leftFront, leftRear);
         rightMotors = Arrays.asList(rightFront, rightRear);
-
+        }
+        else {
+            try {
+                virtualVoltageSensor = new VirtualVoltageSensor();
+            } catch (RobotCoreException e) {
+                e.printStackTrace();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            leftFront = new VirtualMotorEx(this, "leftFront");
+            leftRear = new VirtualMotorEx(this, "leftRear");
+            rightRear = new VirtualMotorEx(this, "rightRear");
+            rightFront = new VirtualMotorEx(this, "rightFront");
+            motors = Arrays.asList(leftFront, leftRear, rightRear, rightFront);
+        	leftMotors = Arrays.asList(leftFront, leftRear);
+        	rightMotors = Arrays.asList(rightFront, rightRear);            
+            _virtualDriveTrain = new DriveTrain(this);
+            _virtualDriveTrain.AddMotors(motors);
+            //setLocalizer(new VirtualLocalizer(_virtualDriveTrain));
+            //setLocalizer(new TankLocalizer(this, false)); // already added by default
+            RobotLogger.dd(TAG, "use default 4 wheel localizer");
+        }
         for (DcMotorEx motor : motors) {
             MotorConfigurationType motorConfigurationType = motor.getMotorType().clone();
             motorConfigurationType.setAchieveableMaxRPMFraction(1.0);
@@ -167,6 +222,7 @@ public class SampleTankDrive extends TankDrive {
     }
 
     public void turnAsync(double angle) {
+		RobotLogger.dd(TAG, "turn: angle "+Double.toString(angle));
         trajectorySequenceRunner.followTrajectorySequenceAsync(
                 trajectorySequenceBuilder(getPoseEstimate())
                         .turn(angle)
@@ -207,12 +263,14 @@ public class SampleTankDrive extends TankDrive {
 
 
     public void update() {
+        RobotLogger.dd(TAG, "roadrunner control loop starts, update pose, update trajectorySequenceRunner, set power");
         updatePoseEstimate();
         DriveSignal signal = trajectorySequenceRunner.update(getPoseEstimate(), getPoseVelocity());
         if (signal != null) setDriveSignal(signal);
     }
 
     public void waitForIdle() {
+		RobotLogger.dd(TAG, "waitForIdle");
         while (!Thread.currentThread().isInterrupted() && isBusy())
             update();
     }
@@ -234,10 +292,20 @@ public class SampleTankDrive extends TankDrive {
     }
 
     public void setPIDFCoefficients(DcMotor.RunMode runMode, PIDFCoefficients coefficients) {
-        PIDFCoefficients compensatedCoefficients = new PIDFCoefficients(
-                coefficients.p, coefficients.i, coefficients.d,
-                coefficients.f * 12 / batteryVoltageSensor.getVoltage()
-        );
+        PIDFCoefficients compensatedCoefficients;
+        if (!DriveConstants.VirtualizeDrive) {
+            compensatedCoefficients = new PIDFCoefficients(
+                    coefficients.p, coefficients.i, coefficients.d,
+                    coefficients.f * 12 / batteryVoltageSensor.getVoltage()
+            );
+        }
+        else {
+            compensatedCoefficients = new PIDFCoefficients(
+                    coefficients.p, coefficients.i, coefficients.d,
+                    coefficients.f * 12 / virtualVoltageSensor.getVoltage()
+            );
+        }
+
         for (DcMotorEx motor : motors) {
             motor.setPIDFCoefficients(runMode, compensatedCoefficients);
         }
@@ -245,6 +313,7 @@ public class SampleTankDrive extends TankDrive {
 
     public void setWeightedDrivePower(Pose2d drivePower) {
         Pose2d vel = drivePower;
+		RobotLogger.dd(TAG, "setWeightedDrivePower" + vel.toString());
 
         if (Math.abs(drivePower.getX()) + Math.abs(drivePower.getHeading()) > 1) {
             // re-normalize the powers according to the weights
@@ -264,6 +333,7 @@ public class SampleTankDrive extends TankDrive {
     @NonNull
     @Override
     public List<Double> getWheelPositions() {
+    	RobotLogger.dd(TAG, "getWheelPositions");
         double leftSum = 0, rightSum = 0;
         for (DcMotorEx leftMotor : leftMotors) {
             leftSum += encoderTicksToInches(leftMotor.getCurrentPosition());
@@ -275,6 +345,8 @@ public class SampleTankDrive extends TankDrive {
     }
 
     public List<Double> getWheelVelocities() {
+    	RobotLogger.dd(TAG, "getWheelVelocities");
+
         double leftSum = 0, rightSum = 0;
         for (DcMotorEx leftMotor : leftMotors) {
             leftSum += encoderTicksToInches(leftMotor.getVelocity());
@@ -287,27 +359,48 @@ public class SampleTankDrive extends TankDrive {
 
     @Override
     public void setMotorPowers(double v, double v1) {
+    	RobotLogger.dd(TAG,"setMotorPowers");
+
         for (DcMotorEx leftMotor : leftMotors) {
             leftMotor.setPower(v);
+            if (DriveConstants.VirtualizeDrive) {  // simulate latency in I/O operation
+            SafeSleep.sleep_milliseconds(opMode, 2);
+        }
         }
         for (DcMotorEx rightMotor : rightMotors) {
             rightMotor.setPower(v1);
+            if (DriveConstants.VirtualizeDrive) {  // simulate latency in I/O operation
+            SafeSleep.sleep_milliseconds(opMode, 2);
+        }
         }
     }
 
     @Override
     public double getRawExternalHeading() {
-        return imu.getAngularOrientation().firstAngle;
+        RobotLogger.callers(4, TAG, "getRawExternalHeading");
+        if (!DriveConstants.VirtualizeDrive) {
+            return imu.getAngularOrientation().firstAngle;
+        } else {
+            Pose2d pose = _virtualDriveTrain.getRobotPose();
+            RobotLogger.dd(TAG, "Simulated Pose (IMU ExternalHeading): " + pose.toString());
+            return pose.getHeading();
+        }
     }
 
     @Override
     public Double getExternalHeadingVelocity() {
+        if (!DriveConstants.VirtualizeDrive)
         // To work around an SDK bug, use -zRotationRate in place of xRotationRate
-        // and -xRotationRate in place of zRotationRate (yRotationRate behaves as
-        // expected). This bug does NOT affect orientation.
+        // and -xRotationRate in place of zRotationRate (yRotationRate behaves as 
+        // expected). This bug does NOT affect orientation. 
         //
         // See https://github.com/FIRST-Tech-Challenge/FtcRobotController/issues/251 for details.
         return (double) -imu.getAngularVelocity().xRotationRate;
+        else {
+            double vel = _virtualDriveTrain.getHeadingVelocity();
+            RobotLogger.dd(TAG, "Simulated Pose (IMU External Heading Velocity): " + vel);
+            return vel;
+        }
     }
 
     public static TrajectoryVelocityConstraint getVelocityConstraint(double maxVel, double maxAngularVel, double trackWidth) {
@@ -320,4 +413,61 @@ public class SampleTankDrive extends TankDrive {
     public static TrajectoryAccelerationConstraint getAccelerationConstraint(double maxAccel) {
         return new ProfileAccelerationConstraint(maxAccel);
     }
+    
+    public void print_list_double(List<Double> list){
+        //motors = Arrays.asList(leftFront, leftRear, rightRear, rightFront);
+        int wheel_num = list.size();
+        if (wheel_num == 4) {
+            for (int i = 0; i < list.size(); i++) {
+                String wheel_name = "";
+                if (i == 0)
+                    wheel_name = "leftFront";
+                else if (i == 1)
+                    wheel_name = "leftRear";
+                else if (i == 2)
+                    wheel_name = "rightRear";
+                else if (i == 3)
+                    wheel_name = "rightFront";
+                else
+                    wheel_name = "unexpected wheel name";
+
+                RobotLogger.dd(TAG, wheel_name + "  " + Double.toString(list.get(i)));
+            }
+        } else if (wheel_num == 3)
+        {
+            for (int i = 0; i < list.size(); i++) {
+                String wheel_name = "";
+                if (i == 0)
+                    wheel_name = "leftOdom";
+                else if (i == 1)
+                    wheel_name = "rightOdom";
+                else if (i == 2)
+                    wheel_name = "frontOdom";
+
+                RobotLogger.dd(TAG, wheel_name + "  " + Double.toString(list.get(i)));
+            }
+        }
+        else
+        {
+            for (int i = 0; i < list.size(); i++) {
+                String wheel_name = "";
+                RobotLogger.dd(TAG, wheel_name + "  " + Double.toString(list.get(i)));
+            }
+        }
+    }
+    public List<DcMotorEx> getMotors() {
+        return motors;
+    }
+    public List<Double> getOdomWheelPositions() {
+        RobotLogger.dd(TAG, "getOdomWheelPositions");
+        List<Double> wheelPositions = new ArrayList<>();
+        List<DcMotorEx> motors = _virtualDriveTrain.getOdomMotors();
+        for (DcMotorEx motor : motors) {
+            int pos = motor.getCurrentPosition();
+            double t = StandardTrackingWheelLocalizer.encoderTicksToInches(pos);
+            RobotLogger.dd(TAG, "getOdomWheelPositions, motor position(ticks): " + pos + "  ticks to inches: " + t);
+            wheelPositions.add(t);
+        }
+        return wheelPositions;
+    }    
 }

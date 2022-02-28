@@ -39,8 +39,9 @@ public class DriveTrain extends BaseDriveTrain {
         List<Double> wheelPositions = drive.getWheelPositions();
         if (lastWheelPositions.size() != 0) {
             List<Double> wheelDeltas = new ArrayList<>();
-            for (DcMotorEx motor : drive_motors) {
-                int index = drive_motors.indexOf(motor);
+            //for (DcMotorEx motor : drive_motors) {
+              //  int index = drive_motors.indexOf(motor);
+            for (int index = 0; index < lastWheelPositions.size(); index ++){
                 wheelDeltas.add(wheelPositions.get(index) - lastWheelPositions.get(index));
             }
             Pose2d robotPoseDelta = ForwardKinematics.wheelToRobotVelocities(wheelDeltas);
@@ -54,14 +55,23 @@ public class DriveTrain extends BaseDriveTrain {
         if (wheelVelocities != null) {
             Pose2d poseVelocity = ForwardKinematics.wheelToRobotVelocities(
                     wheelVelocities);
-
         }
         lastWheelVelocities = wheelVelocities;
         lastWheelPositions = wheelPositions;
         lastExtHeading = extHeading;
         return poseEstimate;
     }
-
+    public double getHeadingVelocity() {
+        double vel = 0;
+        List<Double> wheelVelocities = drive.getWheelVelocities();
+        RobotLogger.dd(TAG, "getHeadingVelocity, size: " + wheelVelocities.size());
+        if (wheelVelocities != null) {
+            Pose2d poseVelocity = ForwardKinematics.wheelToRobotVelocities(
+                    wheelVelocities);
+            vel = poseVelocity.getHeading();
+        }
+        return vel;
+    }
     public void finalize() throws Throwable{
         RobotLogger.callers(8, TAG, "finalize");
         driveTrain_singleInstance = null;

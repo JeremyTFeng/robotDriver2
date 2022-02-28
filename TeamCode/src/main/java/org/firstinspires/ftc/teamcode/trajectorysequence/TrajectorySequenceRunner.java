@@ -21,6 +21,7 @@ import org.firstinspires.ftc.teamcode.trajectorysequence.sequencesegment.Traject
 import org.firstinspires.ftc.teamcode.trajectorysequence.sequencesegment.TurnSegment;
 import org.firstinspires.ftc.teamcode.trajectorysequence.sequencesegment.WaitSegment;
 import org.firstinspires.ftc.teamcode.util.DashboardUtil;
+import org.firstinspires.ftc.teamcode.util.RobotLogger;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,6 +30,8 @@ import java.util.List;
 
 @Config
 public class TrajectorySequenceRunner {
+    private String TAG = "TrajectorySequenceRunner";
+
     public static String COLOR_INACTIVE_TRAJECTORY = "#4caf507a";
     public static String COLOR_INACTIVE_TURN = "#7c4dff7a";
     public static String COLOR_INACTIVE_WAIT = "#dd2c007a";
@@ -67,6 +70,8 @@ public class TrajectorySequenceRunner {
 
         dashboard = FtcDashboard.getInstance();
         dashboard.setTelemetryTransmissionInterval(25);
+
+        RobotLogger.dd(TAG, "created");
     }
 
     public void followTrajectorySequenceAsync(TrajectorySequence trajectorySequence) {
@@ -78,6 +83,7 @@ public class TrajectorySequenceRunner {
 
     public @Nullable
     DriveSignal update(Pose2d poseEstimate, Pose2d poseVelocity) {
+        RobotLogger.dd(TAG, "update");
         Pose2d targetPose = null;
         DriveSignal driveSignal = null;
 
@@ -195,6 +201,13 @@ public class TrajectorySequenceRunner {
         draw(fieldOverlay, currentTrajectorySequence, currentSegment, targetPose, poseEstimate);
 
         dashboard.sendTelemetryPacket(packet);
+
+        RobotLogger.dd(TAG, "update: x " + poseEstimate.getX());
+        RobotLogger.dd(TAG, "y " + poseEstimate.getY());
+        RobotLogger.dd(TAG, "heading " + Math.toDegrees(poseEstimate.getHeading()));
+        RobotLogger.dd(TAG, "xError " + poseEstimate.getX());
+        RobotLogger.dd(TAG, "yError " + poseEstimate.getY());
+        RobotLogger.dd(TAG, "headingError (deg) "  + Math.toDegrees(getLastPoseError().getHeading()));
 
         return driveSignal;
     }

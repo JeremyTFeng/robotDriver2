@@ -13,16 +13,27 @@ import java.util.List;
 
 import static java.lang.Math.cos;
 import static java.lang.Math.sin;
+import static org.firstinspires.ftc.robotcore.internal.system.Assert.assertTrue;
 
 // wheel to Robot
 public class ForwardKinematics {
     public static Pose2d wheelToRobotVelocities(List<Double> wheelVelocities){
         double lateralMultiplier = 1.0;
-        double frontLeft = wheelVelocities.get(0);
-        double rearLeft = wheelVelocities.get(1);
-        double rearRight = wheelVelocities.get(2);
-        double frontRight = wheelVelocities.get(3);
-
+        double frontLeft = 0, rearLeft = 0, rearRight = 0, frontRight = 0;
+        if (wheelVelocities.size() == 4) {
+            frontLeft = wheelVelocities.get(0);
+            rearLeft = wheelVelocities.get(1);
+            rearRight = wheelVelocities.get(2);
+            frontRight = wheelVelocities.get(3);
+        }
+        else if (wheelVelocities.size() == 2) {
+            frontLeft = wheelVelocities.get(0);
+            rearLeft = wheelVelocities.get(0);
+            rearRight = wheelVelocities.get(1);
+            frontRight = wheelVelocities.get(1);
+        }
+        else
+            assertTrue(true);
         double k = (DriveConstants.TRACK_WIDTH + DriveConstants.WHEEL_BASE) / 2.0;
         Pose2d r = new Pose2d(rearLeft + frontRight + frontLeft + rearRight,
                 (rearLeft + frontRight - frontLeft - rearRight) / lateralMultiplier,

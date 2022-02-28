@@ -127,7 +127,7 @@ public class VirtualMotorEx implements DcMotorEx {
         double r = motor_power / kV; //last_get_wheel_position_power / kV;
         r = inchesToTicks(r);
         last_get_wheel_position_power = motor_power;
-        //RobotLogger.dd(TAG, motor_name + ", getVelocity: " + Double.toString(r) + " last_get_wheel_position_power: " + Double.toString(last_get_wheel_position_power));
+        RobotLogger.dd(TAG, motor_name + ", getVelocity: " + Double.toString(r) + " last_get_wheel_position_power: " + Double.toString(last_get_wheel_position_power));
         return r;
     }
 
@@ -478,7 +478,7 @@ public class VirtualMotorEx implements DcMotorEx {
         long time_duration = current_time - last_get_wheel_position_time;
         double v = getVelocity();
         double delta = v * ((double)time_duration) / 1000.0;
-        //RobotLogger.dd(TAG, "current_time: " + current_time + " last_get_wheel_position_time: " + last_get_wheel_position_time + " velocity: " + Double.toString(v) + " delta position: " + Double.toString(delta));
+        RobotLogger.dd(TAG, "current_time: " + current_time + " last_get_wheel_position_time: " + last_get_wheel_position_time + " velocity: " + Double.toString(v) + " delta position: " + Double.toString(delta));
 
         int current_pos =  (int) (delta + last_wheel_position);
 /*

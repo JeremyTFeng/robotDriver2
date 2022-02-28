@@ -19,7 +19,6 @@ import com.acmerobotics.roadrunner.trajectory.constraints.TrajectoryAcceleration
 import com.acmerobotics.roadrunner.trajectory.constraints.TrajectoryVelocityConstraint;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.lynx.LynxModule;
-import com.qualcomm.robotcore.exception.RobotCoreException;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
@@ -40,6 +39,8 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import org.firstinspires.ftc.teamcode.util.RobotLogger;
 import org.firstinspires.ftc.teamcode.util.SafeSleep;
 import org.firstinspires.ftc.teamcode.util.DashboardUtil;
+import com.qualcomm.robotcore.exception.RobotCoreException;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -93,26 +94,32 @@ public class SampleMecanumDrive extends MecanumDrive {
     private Pose2d lastPoseOnTurn;
     private LinearOpMode opMode;
     public void setOpmode(LinearOpMode mode) {
-        opMode = mode;
+        this.opMode = mode;
     }
+
     // end 
-    
+    public SampleMecanumDrive(HardwareMap hardwareMap, LinearOpMode opmode) {
+        this(hardwareMap);
+        this.setOpmode(opmode);
+    }
     public SampleMecanumDrive(HardwareMap hardwareMap) {
         super(kV, kA, kStatic, TRACK_WIDTH, TRACK_WIDTH, LATERAL_MULTIPLIER);
 
         follower = new HolonomicPIDVAFollower(TRANSLATIONAL_PID, TRANSLATIONAL_PID, HEADING_PID,
                 new Pose2d(0.5, 0.5, Math.toRadians(5.0)), 0.5);
-        // simu
+        
+        // simulator 
         poseHistory = new ArrayList<>();
         RobotLogger.dd(TAG, "Mecanum drive is created");
         if (!DriveConstants.VirtualizeDrive) {
+        	
         LynxModuleUtil.ensureMinimumFirmwareVersion(hardwareMap);
 
+        batteryVoltageSensor = hardwareMap.voltageSensor.iterator().next();
 
         for (LynxModule module : hardwareMap.getAll(LynxModule.class)) {
             module.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO);
         }
-        batteryVoltageSensor = hardwareMap.voltageSensor.iterator().next();
 
         // TODO: adjust the names of the following hardware devices to match your configuration
         imu = hardwareMap.get(BNO055IMU.class, "imu");
@@ -253,13 +260,14 @@ public class SampleMecanumDrive extends MecanumDrive {
     }
 
     public void update() {
-        RobotLogger.dd(TAG, "roadrunner control loop starts");
+        RobotLogger.dd(TAG, "roadrunner control loop starts, update pose, update trajectorySequenceRunner, set power");
         updatePoseEstimate();
         DriveSignal signal = trajectorySequenceRunner.update(getPoseEstimate(), getPoseVelocity());
         if (signal != null) setDriveSignal(signal);
     }
 
     public void waitForIdle() {
+        RobotLogger.dd(TAG, "waitForIdle");
         while (!Thread.currentThread().isInterrupted() && isBusy())
             update();
     }
@@ -303,6 +311,7 @@ public class SampleMecanumDrive extends MecanumDrive {
 
     public void setWeightedDrivePower(Pose2d drivePower) {
         Pose2d vel = drivePower;
+        RobotLogger.dd(TAG, "setWeightedDrivePower" + vel.toString());
 
         if (Math.abs(drivePower.getX()) + Math.abs(drivePower.getY())
                 + Math.abs(drivePower.getHeading()) > 1) {
@@ -324,6 +333,8 @@ public class SampleMecanumDrive extends MecanumDrive {
     @NonNull
     @Override
     public List<Double> getWheelPositions() {
+        RobotLogger.dd(TAG, "getWheelPositions");
+
         List<Double> wheelPositions = new ArrayList<>();
         for (DcMotorEx motor : motors) {
             wheelPositions.add(encoderTicksToInches(motor.getCurrentPosition()));
@@ -333,8 +344,9 @@ public class SampleMecanumDrive extends MecanumDrive {
 
     @Override
     public List<Double> getWheelVelocities() {
+    	RobotLogger.dd(TAG, "getWheelVelocities");
+
         List<Double> wheelVelocities = new ArrayList<>();
-        RobotLogger.dd(TAG, "getWheelVelocities");
         for (DcMotorEx motor : motors) {
             wheelVelocities.add(encoderTicksToInches(motor.getVelocity()));
         }
@@ -347,19 +359,19 @@ public class SampleMecanumDrive extends MecanumDrive {
 
         leftFront.setPower(v);
         if (DriveConstants.VirtualizeDrive) {  // simulate latency in I/O operation
-            //SafeSleep.sleep_milliseconds(opMode, 2);
+            SafeSleep.sleep_milliseconds(opMode, 2);
         }
         leftRear.setPower(v1);
         if (DriveConstants.VirtualizeDrive) {
-            //SafeSleep.sleep_milliseconds(opMode, 2);
+            SafeSleep.sleep_milliseconds(opMode, 2);
         }
         rightRear.setPower(v2);
         if (DriveConstants.VirtualizeDrive) {
-            //SafeSleep.sleep_milliseconds(opMode, 2);
+            SafeSleep.sleep_milliseconds(opMode, 2);
         }
         rightFront.setPower(v3);
         if (DriveConstants.VirtualizeDrive) {
-            //SafeSleep.sleep_milliseconds(opMode, 2);
+            SafeSleep.sleep_milliseconds(opMode, 2);
         }
     }
 
@@ -374,6 +386,34 @@ public class SampleMecanumDrive extends MecanumDrive {
             return pose.getHeading();
         }
     }
+
+    @Override
+    public Double getExternalHeadingVelocity() {
+        if (!DriveConstants.VirtualizeDrive)
+        // To work around an SDK bug, use -zRotationRate in place of xRotationRate
+        // and -xRotationRate in place of zRotationRate (yRotationRate behaves as 
+        // expected). This bug does NOT affect orientation. 
+        //
+        // See https://github.com/FIRST-Tech-Challenge/FtcRobotController/issues/251 for details.
+        return (double) -imu.getAngularVelocity().xRotationRate;
+        else {
+            double vel = _virtualDriveTrain.getHeadingVelocity();
+            RobotLogger.dd(TAG, "Simulated Pose (IMU External Heading Velocity): " + vel);
+            return vel;
+        }
+    }
+
+    public static TrajectoryVelocityConstraint getVelocityConstraint(double maxVel, double maxAngularVel, double trackWidth) {
+        return new MinVelocityConstraint(Arrays.asList(
+                new AngularVelocityConstraint(maxAngularVel),
+                new MecanumVelocityConstraint(maxVel, trackWidth)
+        ));
+    }
+
+    public static TrajectoryAccelerationConstraint getAccelerationConstraint(double maxAccel) {
+        return new ProfileAccelerationConstraint(maxAccel);
+    }
+    
     public void print_list_double(List<Double> list){
         //motors = Arrays.asList(leftFront, leftRear, rightRear, rightFront);
         int wheel_num = list.size();
@@ -429,25 +469,6 @@ public class SampleMecanumDrive extends MecanumDrive {
             wheelPositions.add(t);
         }
         return wheelPositions;
-    }
-    @Override
-    public Double getExternalHeadingVelocity() {
-        // To work around an SDK bug, use -zRotationRate in place of xRotationRate
-        // and -xRotationRate in place of zRotationRate (yRotationRate behaves as 
-        // expected). This bug does NOT affect orientation. 
-        //
-        // See https://github.com/FIRST-Tech-Challenge/FtcRobotController/issues/251 for details.
-        return (double) -imu.getAngularVelocity().xRotationRate;
-    }
-
-    public static TrajectoryVelocityConstraint getVelocityConstraint(double maxVel, double maxAngularVel, double trackWidth) {
-        return new MinVelocityConstraint(Arrays.asList(
-                new AngularVelocityConstraint(maxAngularVel),
-                new MecanumVelocityConstraint(maxVel, trackWidth)
-        ));
-    }
-
-    public static TrajectoryAccelerationConstraint getAccelerationConstraint(double maxAccel) {
-        return new ProfileAccelerationConstraint(maxAccel);
-    }
+    }    
 }
+
