@@ -64,7 +64,7 @@ public class SimpleDrive extends LinearOpMode {
 
 
             RobotLogger.dd(TAG, "localizer: (" + currentX + ", " + currentY + ", " + currentHeading + ")");
-            fieldDashboard.updateDashboard();
+            //fieldDashboard.updateDashboard();
 
             SafeSleep.sleep_milliseconds(this, 50);
         }

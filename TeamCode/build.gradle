@@ -28,5 +28,7 @@ dependencies {
     //implementation 'com.acmerobotics.roadrunner:core:0.5.5'
 	implementation project(path: ':core')
     //implementation project(path: ':custom-detekt-rules')
+
+    implementation 'org.openftc:easyopencv:1.5.1'
     //implementation project(path: ':easy_opencv_lib')
 }

@@ -19,6 +19,7 @@ public class DriveConstants {
 	// simulator
     public static boolean ENABLE_LOGGING = true;
     public static boolean VirtualizeDrive = true;
+    public static boolean USE_VUFORIA_LOCALIZER = false;
     public static double odoTicksPerRevRight = 8114.5280;
     public static double odoTicksPerRevLeft = 8133.0806;
     public static double odoTicksPerRevHorizontal = 8104.8806;
