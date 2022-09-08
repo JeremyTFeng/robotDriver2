@@ -13,3 +13,4 @@ project(':core').projectDir = new File(rootDir, 'road-runner-lib/core/')
 
 include ':custom-detekt-rules'
 project(':custom-detekt-rules').projectDir = new File(rootDir, 'road-runner-lib/custom-detekt-rules/')
+include ':meepmeeptesting'
