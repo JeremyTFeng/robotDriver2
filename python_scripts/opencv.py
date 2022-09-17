@@ -131,8 +131,9 @@ class Util:
             cv2_imshow(img)
         else:
             if (img.all() != None):
-                plt.imshow(img)
-                plt.title('ORIGINAL')
+                RGB_img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+                plt.imshow(RGB_img)
+                #plt.title('ORIGINAL')
                 plt.show()
             else:
                 assert(0)

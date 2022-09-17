@@ -23,7 +23,8 @@ dependencies {
     implementation 'org.firstinspires.ftc:gameAssets-FreightFrenzy:1.0.0'
 
     // FtcDashboard and dependencies
-    implementation files('../libs/FtcDashboard-release.aar')
+    implementation files('../libs/FtcDashboard-release.aar')  // 0.4.4
+    //implementation files('../libs/FtcDashboard-0.4.5.aar')  //
     implementation 'androidx.annotation:annotation:1.1.0'
     implementation('org.nanohttpd:nanohttpd-websocket:2.3.1') {exclude module: 'nanohttpd'}
 }
