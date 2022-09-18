@@ -25,7 +25,7 @@ public class MeepMeepTesting {
                                 .build()
                 );
 
-        meepMeep.setBackground(MeepMeep.Background.FIELD_SKYSTONE_OFFICIAL)
+        meepMeep.setBackground(MeepMeep.Background.FIELD_POWERPLAY_OFFICIAL)
                 .setDarkMode(true)
                 .setBackgroundAlpha(0.95f)
                 .addEntity(myBot)
