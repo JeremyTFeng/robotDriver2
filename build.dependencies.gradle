@@ -2,6 +2,7 @@ repositories {
     //mavenLocal()
     mavenCentral()
     google() // Needed for androidx
+
     jcenter()  // Needed for tensorflow-lite
     maven { url = 'https://maven.brott.dev/' }
     flatDir {
@@ -10,22 +11,23 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.firstinspires.ftc:Inspection:7.1.0'
-    implementation 'org.firstinspires.ftc:Blocks:7.1.0'
-    implementation 'org.firstinspires.ftc:Tfod:7.1.0'
-    implementation 'org.firstinspires.ftc:RobotCore:7.1.0'
-    implementation 'org.firstinspires.ftc:RobotServer:7.1.0'
-    implementation 'org.firstinspires.ftc:OnBotJava:7.1.0'
-    implementation 'org.firstinspires.ftc:Hardware:7.1.0'
-    implementation 'org.firstinspires.ftc:FtcCommon:7.1.0'
+    // FtcDashboard and dependencies
+    //implementation files('../libs/FtcDashboard-release.aar')  // 0.4.4
+    implementation 'com.acmerobotics.dashboard:dashboard:0.4.5'  //
+    //implementation 'androidx.annotation:annotation:1.1.0'
+    implementation('org.nanohttpd:nanohttpd-websocket:2.3.1') {exclude module: 'nanohttpd'}
+
+    implementation 'org.firstinspires.ftc:Inspection:8.0.0'
+    implementation 'org.firstinspires.ftc:Blocks:8.0.0'
+    implementation 'org.firstinspires.ftc:Tfod:8.0.0'
+    implementation 'org.firstinspires.ftc:RobotCore:8.0.0'
+    implementation 'org.firstinspires.ftc:RobotServer:8.0.0'
+    implementation 'org.firstinspires.ftc:OnBotJava:8.0.0'
+    implementation 'org.firstinspires.ftc:Hardware:8.0.0'
+    implementation 'org.firstinspires.ftc:FtcCommon:8.0.0'
     implementation 'org.tensorflow:tensorflow-lite-task-vision:0.2.0'
     implementation 'androidx.appcompat:appcompat:1.2.0'
-    implementation 'org.firstinspires.ftc:gameAssets-FreightFrenzy:1.0.0'
+    implementation 'org.firstinspires.ftc:gameAssets-PowerPlay:1.0.0'
 
-    // FtcDashboard and dependencies
-    implementation files('../libs/FtcDashboard-release.aar')  // 0.4.4
-    //implementation files('../libs/FtcDashboard-0.4.5.aar')  //
-    implementation 'androidx.annotation:annotation:1.1.0'
-    implementation('org.nanohttpd:nanohttpd-websocket:2.3.1') {exclude module: 'nanohttpd'}
 }
 

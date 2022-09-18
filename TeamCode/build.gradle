@@ -17,6 +17,7 @@ apply from: '../build.dependencies.gradle'
 
 android {
     buildToolsVersion '29.0.2'
+    namespace = 'org.firstinspires.ftc.teamcode'
 }
 
 dependencies {
