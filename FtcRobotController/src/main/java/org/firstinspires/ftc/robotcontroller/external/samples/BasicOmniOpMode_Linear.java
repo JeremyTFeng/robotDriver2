@@ -47,6 +47,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  * Note that a Mecanum drive must display an X roller-pattern when viewed from above.
  *
 <<<<<<< HEAD
+<<<<<<< HEAD
  * Holonomic drives provide the ability for the robot to move in three axes (directions) simultaneously.
  * Each motion axis is controlled by one Joystick axis.
  *
@@ -58,16 +59,18 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  * Each motion axis is controlled by one Joystick axis.
  *
  * 1) Axial:    Driving forward and backward               Left-joystick Forward/Backward
->>>>>>> first/master
+
+ * Also note that it is critical to set the correct rotation direction for each motor.  See details below.
+ *
+ * Holonomic drives provide the ability for the robot to move in three axes (directions) simultaneously.
+ * Each motion axis is controlled by one Joystick axis.
+ *
+ * 1) Axial:    Driving forward and backward               Left-joystick Forward/Backward
  * 2) Lateral:  Strafing right and left                     Left-joystick Right and Left
  * 3) Yaw:      Rotating Clockwise and counter clockwise    Right-joystick Right and Left
  *
  * This code is written assuming that the right-side motors need to be reversed for the robot to drive forward.
-<<<<<<< HEAD
- * When you first test your robot, if it moves backwards when you push the left stick forward, then you must flip
-=======
  * When you first test your robot, if it moves backward when you push the left stick forward, then you must flip
->>>>>>> first/master
  * the direction of all 4 motors (see code below).
  *
  * Use Android Studio to Copy this Class, and Paste it into your team's code folder with a new name.
@@ -104,6 +107,7 @@ public class BasicOmniOpMode_Linear extends LinearOpMode {
         // !!!            IMPORTANT Drive Information. Test your motor directions.            !!!!!
         // ########################################################################################
         // Most robots need the motors on one side to be reversed to drive forward.
+
         // The motor reversals shown here are for a "direct drive" robot (the wheels turn the same direction as the motor shaft)
         // If your robot has additional gear reductions or uses a right-angled drive, it's important to ensure
         // that your motors are turning in the correct direction.  So, start out with the reversals here, BUT
