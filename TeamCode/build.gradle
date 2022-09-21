@@ -32,6 +32,5 @@ dependencies {
     //implementation project(path: ':custom-detekt-rules')
     //implementation project(path: ':easy_opencv_lib')
     implementation 'org.openftc:easyopencv:1.5.2'
-
-
+    implementation 'org.openftc:apriltag:1.1.0'
 }
