@@ -1,15 +1,19 @@
 package org.firstinspires.ftc.teamcode.vision;
 
+import static org.checkerframework.checker.units.UnitsTools.h;
+
 import org.firstinspires.ftc.teamcode.util.RobotLogger;
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
+import org.opencv.core.MatOfRect;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.objdetect.CascadeClassifier;
 import org.openftc.easyopencv.OpenCvPipeline;
 
 import java.util.ArrayList;
@@ -22,7 +26,8 @@ public class OpenCVObjectDetector extends OpenCvPipeline {
         NONE
     }
     private String TAG = "OpenCVObjectDetector";
-    private String saveImgFileName = "/sdcard/FIRST/capture.jpg";
+    static public String ftcDirPath = "/sdcard/FIRST/";
+    private String saveImgFileName = ftcDirPath + "capture.jpg";
     private boolean doneImageCapture = false;
     private int width; // width of the image
     public SkystoneLocation location;
@@ -137,5 +142,25 @@ public class OpenCVObjectDetector extends OpenCvPipeline {
 
     public SkystoneLocation getLocation() {
         return this.location;
+    }
+}
+
+class CustomizedObjDetect {
+    public void doWork(Mat input) {
+        Imgcodecs imageCodecs = new Imgcodecs();
+        CascadeClassifier face_cascade = new CascadeClassifier(OpenCVObjectDetector.ftcDirPath + "haarcascade_frontalface_default.xml");
+        Mat gray = new Mat();
+        Imgproc.cvtColor(input, gray, Imgproc.COLOR_BGR2GRAY);
+        //    # Detect the faces
+        //Detecting the face in the snap
+        MatOfRect faceDetections = new MatOfRect();
+        face_cascade.detectMultiScale(gray, faceDetections, 1.1);
+        int i = 0;
+        for (Rect rect : faceDetections.toArray()) {
+            Imgproc.rectangle(input, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(0, 255, 0));
+            imageCodecs.imwrite(OpenCVObjectDetector.ftcDirPath + String.valueOf(i) + ".jpg", input);
+            i = i + 1;
+        }
+        //# Stop if escape key is pressed
     }
 }

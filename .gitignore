@@ -4,6 +4,8 @@
 *.log
 *.aab
 
+python_scripts/output/*
+
 !libs/*.aar
 
 # Files for the ART/Dalvik VM

@@ -140,7 +140,7 @@ class Util:
     @staticmethod
     def translate(image, x, y):
         M = np.float32([[1, 0, x], [0, 1, y]])
-        shifted = cv2.warpAffine(image, M, (image.shape[1], image.shape[0]))
+        shifted = cv.warpAffine(image, M, (image.shape[1], image.shape[0]))
         return shifted
 
     @staticmethod
@@ -150,8 +150,8 @@ class Util:
         if center is None:
             center = (w // 2, h // 2)
 
-        M = cv2.getRotationMatrix2D(center, angle, scale)
-        rotated = cv2.warpAffine(image, M, (w, h))
+        M = cv.getRotationMatrix2D(center, angle, scale)
+        rotated = cv.warpAffine(image, M, (w, h))
 
         return rotated
 
@@ -1138,17 +1138,204 @@ class TemplateUtil:
 
         plt.imshow(img3, ), plt.show()
 
-def test_colab():
-    #Util.whoami()
-    input_file = GoogleDrive().getDrivePath() + "py_images\\4xw.obstacles.jpg"
-    Util.show_named_img(input_file)
+class PowerPlay:
+    def read_vid_img(self, vid_file, sampling_rate=None, index=None):  # read the video file, return one frame #index
+        if sampling_rate is None:
+            sampling_rate = 100
+        if index is None:
+            index = 10
+        vidcap = cv.VideoCapture(vid_file)
+        height = vidcap.get(cv.CAP_PROP_FRAME_HEIGHT)  # always 0 in Linux python3
+        width = vidcap.get(cv.CAP_PROP_FRAME_WIDTH)  # always 0 in Linux python3
+        print("opencv: height:{} width:{}".format(height, width))
+        success, image = vidcap.read()
+        count = 0
+        while success:
+            if count % sampling_rate == 0:
+                idx = count/sampling_rate
+                cv.imwrite("output\\frame%d.jpg" % idx, image)  # save frame as JPEG file
+                if idx == index:
+                    mat = image
+                    break
+                if idx >= 10:
+                    break
+            success, image = vidcap.read()
+            count += 1
+        return mat
 
-def main():
-    #test_colab()
-    ringDection = DetectRingUtil()
-    ringDection.do_test("py_images\\4xw.obstacles.jpg")
+    def processMat(self, mat):
+        #contour = ContourUtil.findMajorContours(t)
+        #Util.getEdges(t)
+        self.processContour(mat)
+
+    def findMask(self, img, find_circle=None):
+        if find_circle is None:
+            find_circle = 0
+        ORANGE_MIN = np.array([15, 50, 50], np.uint8)
+        ORANGE_MAX = np.array([25, 255, 255], np.uint8)
+        BLACK_MIN = np.array([0, 0, 0], np.uint8)
+        BLACK_MAX = np.array([180, 255, 40], np.uint8)
+        blurred = cv.GaussianBlur(img, (11, 11), 0)
+        hsv = cv.cvtColor(blurred, cv.COLOR_BGR2HSV)
+        if find_circle!=0:
+            mask = cv.inRange(hsv, BLACK_MIN, BLACK_MAX)
+        else:
+            mask = cv.inRange(hsv, ORANGE_MIN, ORANGE_MAX)
+        mask = cv.erode(mask, np.ones((2, 1)), iterations=1)
+        mask = cv.dilate(mask, None, iterations=3)
+        Util.diplay_img_data(mask)
+        return mask
+
+    # https://www.programcreek.com/python/example/77056/cv2.minEnclosingCircle
+    def processColor(self, img):
+        mask = self.findMask(img)
+        cnts = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)[-2]
+        frame = img.copy()
+        ###based on example from  http://www.pyimagesearch.com/2015/09/14/ball-tracking-with-opencv
+        if len(cnts) > 0:
+            c = max(cnts, key=cv.contourArea)
+            ((x, y), radius) = cv.minEnclosingCircle(c)
+            M = cv.moments(c)
+            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+            if radius > 3:
+                cv.circle(frame, (int(x), int(y)), 12, (0, 255, 255), 2)
+        Util.diplay_img_data(frame)
+        return frame
+
+    def processContour(self, img, original_img):
+        # setting threshold of gray image
+        _, threshold = cv.threshold(img, 127, 255, cv.THRESH_BINARY)
+
+        # using a findContours() function
+        contours, _ = cv.findContours(
+            threshold, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+
+        i = 0
+
+        # list for storing names of shapes
+        for contour in contours:
+            # here we are ignoring first counter because
+            # findcontour function detects whole image as shape
+            if i == 0:
+                i = 1
+                continue
+
+            # cv.approxPloyDP() function to approximate the shape
+            approx = cv.approxPolyDP(
+                contour, 0.01 * cv.arcLength(contour, True), True)
+
+            # finding center point of shape
+            M = cv.moments(contour)
+            if M['m00'] != 0.0:
+                x = int(M['m10'] / M['m00'])
+                y = int(M['m01'] / M['m00'])
+            drawIt = 1
+            # putting shape name at center of each shape
+            if len(approx) == 3:
+                cv.putText(original_img, 'Triangle', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                pass
+            elif len(approx) == 4:
+                cv.putText(original_img, 'Quadrilateral', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                pass
+            elif len(approx) == 5:
+                cv.putText(original_img, 'Pentagon', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                pass
+            elif len(approx) == 6:
+                cv.putText(original_img, 'Hexagon', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                pass
+            else:
+                drawIt = 0
+                pass
+            if drawIt == 1:
+                cv.drawContours(original_img, [contour], 0, (0, 0, 255), 5)
+
+        # displaying the image after drawing contours
+        Util.diplay_img_data(original_img)
+
+    def processContourCircle(self, img, orig_img):
+        # converting image into grayscale image
+        #gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+
+        # setting threshold of gray image
+        _, threshold = cv.threshold(img, 127, 255, cv.THRESH_BINARY)
+
+        # using a findContours() function
+        contours, _ = cv.findContours(
+            threshold, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+
+        i = 0
+
+        # list for storing names of shapes
+        for contour in contours:
+            # here we are ignoring first counter because 
+            # findcontour function detects whole image as shape
+            if i == 0:
+                i = 1
+                continue
+
+            # cv.approxPloyDP() function to approximate the shape
+            approx = cv.approxPolyDP(
+                contour, 0.01 * cv.arcLength(contour, True), True)
+
+            # finding center point of shape
+            M = cv.moments(contour)
+            if M['m00'] != 0.0:
+                x = int(M['m10'] / M['m00'])
+                y = int(M['m01'] / M['m00'])
+
+            # putting shape name at center of each shape
+            if len(approx) == 3:
+                cv.putText(orig_img, 'Triangle', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                pass
+            elif len(approx) == 4:
+                cv.putText(orig_img, 'Quadrilateral', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                pass
+            elif len(approx) == 5:
+                cv.putText(orig_img, 'Pentagon', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                pass
+            elif len(approx) == 6:
+                cv.putText(orig_img, 'Hexagon', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                pass
+            elif len(approx) > 10:
+                ((x0, y0), radius) = cv.minEnclosingCircle(approx)
+                if radius > 20.0:
+                    # using drawContours() function
+                    cv.drawContours(orig_img, [contour], 0, (0, 0, 255), 5)
+                    #cv.putText(img, str(len(approx)), (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)   # circle
+                    cv.putText(orig_img, '', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)  # circle
+
+        # displaying the image after drawing contours
+        Util.diplay_img_data(orig_img)
+
+class Test:
+    @staticmethod
+    def test_colab():
+        #Util.whoami()
+        input_file = GoogleDrive().getDrivePath() + "py_images\\4xw.obstacles.jpg"
+        Util.show_named_img(input_file)
+
+    @staticmethod
+    def test_ring_detection():
+        #test_colab()
+        ringDection = DetectRingUtil()
+        ringDection.do_test("py_images\\4xw.obstacles.jpg")
+        
+    @staticmethod
+    def test_power_play(video_file, find_circle=None):
+        if find_circle is None:
+            find_circle = 0
+        power_play = PowerPlay()
+        mat = power_play.read_vid_img(video_file, sampling_rate=100, index=3)
+        resized_mat = Util.resize(mat, 720)
+        masked_mat = power_play.findMask(resized_mat, find_circle)
+        if find_circle == 0:
+            power_play.processContour(masked_mat, resized_mat)
+        else:
+            power_play.processContourCircle(masked_mat, resized_mat)
+        #power_play.processColor(mat)
 
 if __name__ == "__main__":
-    main()
-
+    #Test.test_ring_detection()
+    Test.test_power_play("py_images\\1.MOV", find_circle=0)
+    Test.test_power_play("py_images\\2.MOV", find_circle=1)
 
