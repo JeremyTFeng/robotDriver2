@@ -24,7 +24,11 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 import cv2 as cv
+import numpy as np
 import imutils
+from collections import deque
+import time
+
 #from google.colab import drive
 #from google.colab.patches import cv2_imshow
 # feature_match()
@@ -1028,7 +1032,6 @@ class HistogramUtil:
     """# Template Matching
     
     """
-
 class TemplateUtil:
     def template_match(self):
         img = cv.imread('/content/object_detection_demo/data/images/train/messi5.jpg', 0)
@@ -1138,8 +1141,122 @@ class TemplateUtil:
 
         plt.imshow(img3, ), plt.show()
 
+class HSV_range_finder:
+    @staticmethod
+    def nothing(x):
+        pass
+    @staticmethod
+    def do_work(img_file):
+        # Create a window
+        cv.namedWindow('image')
+
+        # create trackbars for color change
+        cv.createTrackbar('HMin', 'image', 0, 179, HSV_range_finder.nothing)  # Hue is from 0-179 for Opencv
+        cv.createTrackbar('SMin', 'image', 0, 255, HSV_range_finder.nothing)
+        cv.createTrackbar('VMin', 'image', 0, 255, HSV_range_finder.nothing)
+        cv.createTrackbar('HMax', 'image', 0, 179, HSV_range_finder.nothing)
+        cv.createTrackbar('SMax', 'image', 0, 255, HSV_range_finder.nothing)
+        cv.createTrackbar('VMax', 'image', 0, 255, HSV_range_finder.nothing)
+
+        # Set default value for MAX HSV trackbars.
+        cv.setTrackbarPos('HMax', 'image', 179)
+        cv.setTrackbarPos('SMax', 'image', 255)
+        cv.setTrackbarPos('VMax', 'image', 255)
+
+        # Initialize to check if HSV min/max value changes
+        hMin = sMin = vMin = hMax = sMax = vMax = 0
+        phMin = psMin = pvMin = phMax = psMax = pvMax = 0
+
+        #img = cv.imread('py_images\\1xw.obstacles.jpg')
+        img = cv.imread(img_file)
+        output = img
+        waitTime = 33
+
+        while (1):
+
+            # get current positions of all trackbars
+            hMin = cv.getTrackbarPos('HMin', 'image')
+            sMin = cv.getTrackbarPos('SMin', 'image')
+            vMin = cv.getTrackbarPos('VMin', 'image')
+
+            hMax = cv.getTrackbarPos('HMax', 'image')
+            sMax = cv.getTrackbarPos('SMax', 'image')
+            vMax = cv.getTrackbarPos('VMax', 'image')
+
+            # Set minimum and max HSV values to display
+            lower = np.array([hMin, sMin, vMin])
+            upper = np.array([hMax, sMax, vMax])
+
+            # Create HSV Image and threshold into a range.
+            hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
+            mask = cv.inRange(hsv, lower, upper)
+            output = cv.bitwise_and(img, img, mask=mask)
+
+            # Print if there is a change in HSV value
+            if ((phMin != hMin) | (psMin != sMin) | (pvMin != vMin) | (phMax != hMax) | (psMax != sMax) | (
+                    pvMax != vMax)):
+                print("(hMin = %d , sMin = %d, vMin = %d), (hMax = %d , sMax = %d, vMax = %d)" % (
+                hMin, sMin, vMin, hMax, sMax, vMax))
+                phMin = hMin
+                psMin = sMin
+                pvMin = vMin
+                phMax = hMax
+                psMax = sMax
+                pvMax = vMax
+
+            # Display output image
+            cv.imshow('image', output)
+
+            # Wait longer to prevent freeze for videos.
+            if cv.waitKey(waitTime) & 0xFF == ord('q'):
+                break
+
+        # Release resources
+        cv.destroyAllWindows()
+
 class PowerPlay:
-    def read_vid_img(self, vid_file, sampling_rate=None, index=None):  # read the video file, return one frame #index
+    def __init__(self, vid_file, debug=0, detect_circle=1, continous_mode=0):
+        self.vid_file = vid_file
+        self.pts = deque(maxlen=1000)
+        if debug is None:
+            self.debug_display = 0
+        else:
+            self.debug_display = debug
+        if detect_circle is None:
+            self.detect_circle = 0
+        else:
+            self.detect_circle = detect_circle
+        if continous_mode is None:
+            self.continous_mode = 0
+        else:
+            self.continous_mode = continous_mode
+
+    def process_img_object_tracking(self, img):
+        resized_img = Util.resize(img, 720)
+        mask = self.findMask(resized_img)
+        center = self.processContour(mask, img)
+        if center != None:
+            self.pts.appendleft(center)
+
+    def loop_vid_frames(self, sampling_rate=None):
+        if sampling_rate is None:
+            sampling_rate = 30
+        vidcap = cv.VideoCapture(self.vid_file)
+        height = vidcap.get(cv.CAP_PROP_FRAME_HEIGHT)  # always 0 in Linux python3
+        width = vidcap.get(cv.CAP_PROP_FRAME_WIDTH)  # always 0 in Linux python3
+        print("opencv: height:{} width:{}".format(height, width))
+        success, image = vidcap.read()
+        count = 0
+        while success:
+            count += 1
+            print("reading frame ", count)
+            success, image = vidcap.read()
+            if count % sampling_rate == 0:
+                self.process_img_object_tracking(image)
+                #time.sleep(2.0)
+
+
+    def read_vid_sample(self, vid_file, sampling_rate=None, index=None):  # read the video file, return one frame #index
         if sampling_rate is None:
             sampling_rate = 100
         if index is None:
@@ -1168,145 +1285,86 @@ class PowerPlay:
         #Util.getEdges(t)
         self.processContour(mat)
 
-    def findMask(self, img, find_circle=None):
-        if find_circle is None:
-            find_circle = 0
-        ORANGE_MIN = np.array([15, 50, 50], np.uint8)
-        ORANGE_MAX = np.array([25, 255, 255], np.uint8)
+    # mask in color range
+    def findMask(self, img):
+        #ORANGE_MIN = np.array([15, 50, 50], np.uint8)
+        #ORANGE_MAX = np.array([25, 255, 255], np.uint8)
+        ORANGE_MIN = np.array([0, 49, 0], np.uint8)
+        ORANGE_MAX = np.array([97, 255, 255], np.uint8)
         BLACK_MIN = np.array([0, 0, 0], np.uint8)
         BLACK_MAX = np.array([180, 255, 40], np.uint8)
+        GRAY_MIN = np.array([22, 0, 113]) #(hMin = 0 , sMin = 0, vMin = 113), (hMax = 133 , sMax = 29, vMax = 255)
+        GRAY_MAX = np.array([133, 29, 255])
         blurred = cv.GaussianBlur(img, (11, 11), 0)
         hsv = cv.cvtColor(blurred, cv.COLOR_BGR2HSV)
-        if find_circle!=0:
-            mask = cv.inRange(hsv, BLACK_MIN, BLACK_MAX)
+        if self.debug_display != 0:
+            Util.diplay_img_data(hsv)
+        if self.detect_circle !=0:
+            mask = cv.inRange(hsv, GRAY_MIN, GRAY_MAX)
         else:
             mask = cv.inRange(hsv, ORANGE_MIN, ORANGE_MAX)
         mask = cv.erode(mask, np.ones((2, 1)), iterations=1)
         mask = cv.dilate(mask, None, iterations=3)
-        Util.diplay_img_data(mask)
+        if self.debug_display != 0:
+            Util.diplay_img_data(mask)
         return mask
 
-    # https://www.programcreek.com/python/example/77056/cv2.minEnclosingCircle
-    def processColor(self, img):
-        mask = self.findMask(img)
-        cnts = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)[-2]
-        frame = img.copy()
-        ###based on example from  http://www.pyimagesearch.com/2015/09/14/ball-tracking-with-opencv
-        if len(cnts) > 0:
-            c = max(cnts, key=cv.contourArea)
-            ((x, y), radius) = cv.minEnclosingCircle(c)
-            M = cv.moments(c)
-            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-            if radius > 3:
-                cv.circle(frame, (int(x), int(y)), 12, (0, 255, 255), 2)
-        Util.diplay_img_data(frame)
-        return frame
+    # https://www.programcreek.com/python/example/77056/cv.minEnclosingCircle
+    def processContour(self, img, orig_img, topnum=3):
+        if topnum is None:
+            topnum = 3
+        contours = cv.findContours(img.copy(), cv.RETR_EXTERNAL,
+                                cv.CHAIN_APPROX_SIMPLE)
+        contours = imutils.grab_contours(contours)
+        circle_center = None
 
-    def processContour(self, img, original_img):
-        # setting threshold of gray image
-        _, threshold = cv.threshold(img, 127, 255, cv.THRESH_BINARY)
-
-        # using a findContours() function
-        contours, _ = cv.findContours(
-            threshold, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-
-        i = 0
-
-        # list for storing names of shapes
-        for contour in contours:
-            # here we are ignoring first counter because
-            # findcontour function detects whole image as shape
-            if i == 0:
-                i = 1
-                continue
-
-            # cv.approxPloyDP() function to approximate the shape
-            approx = cv.approxPolyDP(
-                contour, 0.01 * cv.arcLength(contour, True), True)
-
-            # finding center point of shape
-            M = cv.moments(contour)
-            if M['m00'] != 0.0:
-                x = int(M['m10'] / M['m00'])
-                y = int(M['m01'] / M['m00'])
-            drawIt = 1
-            # putting shape name at center of each shape
-            if len(approx) == 3:
-                cv.putText(original_img, 'Triangle', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                pass
-            elif len(approx) == 4:
-                cv.putText(original_img, 'Quadrilateral', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                pass
-            elif len(approx) == 5:
-                cv.putText(original_img, 'Pentagon', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                pass
-            elif len(approx) == 6:
-                cv.putText(original_img, 'Hexagon', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                pass
+        # only proceed if at least one contour was found
+        if len(contours) > 0:
+            max_contour = max(contours, key=cv.contourArea)
+            if self.detect_circle:
+                # find the largest contour in the mask, then use
+                # it to compute the minimum enclosing circle and
+                # centroid
+                ((x, y), radius) = cv.minEnclosingCircle(max_contour)
+                M = cv.moments(max_contour)
+                circle_center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+                # only proceed if the radius meets a minimum size
+                if radius > 10:
+                    # draw the circle and centroid on the frame,
+                    # then update the list of tracked points
+                    cv.circle(orig_img, (int(x), int(y)), int(radius), (0, 255, 255), 2)
+                    cv.circle(orig_img, circle_center, 5, (0, 0, 255), -1)
+                    cv.drawContours(orig_img, [max_contour], 0, (0, 0, 255), 5)
             else:
-                drawIt = 0
-                pass
-            if drawIt == 1:
-                cv.drawContours(original_img, [contour], 0, (0, 0, 255), 5)
+                contoursSorted = sorted(contours, key=lambda x: cv.contourArea(x), reverse=True)
+                for idx in range(topnum):
+                    contour = contoursSorted[idx]
+                    # cv.approxPloyDP() function to approximate the shape
+                    approx = cv.approxPolyDP(
+                        contour, 0.01 * cv.arcLength(contour, True), True)
 
-        # displaying the image after drawing contours
-        Util.diplay_img_data(original_img)
+                    # finding center point of shape
+                    M = cv.moments(contour)
+                    if M['m00'] != 0.0:
+                        x = int(M['m10'] / M['m00'])
+                        y = int(M['m01'] / M['m00'])
 
-    def processContourCircle(self, img, orig_img):
-        # converting image into grayscale image
-        #gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-
-        # setting threshold of gray image
-        _, threshold = cv.threshold(img, 127, 255, cv.THRESH_BINARY)
-
-        # using a findContours() function
-        contours, _ = cv.findContours(
-            threshold, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-
-        i = 0
-
-        # list for storing names of shapes
-        for contour in contours:
-            # here we are ignoring first counter because 
-            # findcontour function detects whole image as shape
-            if i == 0:
-                i = 1
-                continue
-
-            # cv.approxPloyDP() function to approximate the shape
-            approx = cv.approxPolyDP(
-                contour, 0.01 * cv.arcLength(contour, True), True)
-
-            # finding center point of shape
-            M = cv.moments(contour)
-            if M['m00'] != 0.0:
-                x = int(M['m10'] / M['m00'])
-                y = int(M['m01'] / M['m00'])
-
-            # putting shape name at center of each shape
-            if len(approx) == 3:
-                cv.putText(orig_img, 'Triangle', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                pass
-            elif len(approx) == 4:
-                cv.putText(orig_img, 'Quadrilateral', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                pass
-            elif len(approx) == 5:
-                cv.putText(orig_img, 'Pentagon', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                pass
-            elif len(approx) == 6:
-                cv.putText(orig_img, 'Hexagon', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                pass
-            elif len(approx) > 10:
-                ((x0, y0), radius) = cv.minEnclosingCircle(approx)
-                if radius > 20.0:
-                    # using drawContours() function
+                    # putting shape name at center of each shape
+                    if len(approx) == 3:
+                        cv.putText(orig_img, 'Triangle', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                    elif len(approx) == 4:
+                        cv.putText(orig_img, 'Quadrilateral', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                    elif len(approx) == 5:
+                        cv.putText(orig_img, 'Pentagon', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                    elif len(approx) == 6:
+                        cv.putText(orig_img, 'Hexagon', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                    else:
+                        cv.putText(orig_img, 'other', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
                     cv.drawContours(orig_img, [contour], 0, (0, 0, 255), 5)
-                    #cv.putText(img, str(len(approx)), (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)   # circle
-                    cv.putText(orig_img, '', (x, y), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)  # circle
-
         # displaying the image after drawing contours
-        Util.diplay_img_data(orig_img)
-
+        if self.debug_display == 1 or self.continous_mode == 1:
+            Util.diplay_img_data(orig_img)
+        return circle_center
 class Test:
     @staticmethod
     def test_colab():
@@ -1321,21 +1379,28 @@ class Test:
         ringDection.do_test("py_images\\4xw.obstacles.jpg")
         
     @staticmethod
-    def test_power_play(video_file, find_circle=None):
+    def test_power_play_image(video_file, find_circle=None):
         if find_circle is None:
             find_circle = 0
-        power_play = PowerPlay()
-        mat = power_play.read_vid_img(video_file, sampling_rate=100, index=3)
+        power_play = PowerPlay(video_file, debug=1, detect_circle=find_circle)
+        mat = power_play.read_vid_sample(video_file, sampling_rate=100, index=3)
         resized_mat = Util.resize(mat, 720)
-        masked_mat = power_play.findMask(resized_mat, find_circle)
-        if find_circle == 0:
-            power_play.processContour(masked_mat, resized_mat)
-        else:
-            power_play.processContourCircle(masked_mat, resized_mat)
-        #power_play.processColor(mat)
+        masked_mat = power_play.findMask(resized_mat)
+        power_play.processContour(masked_mat, resized_mat)
+
+    @staticmethod
+    def test_power_play_tracking(video_file, find_circle=None):
+        if find_circle is None:
+            find_circle = 0
+        power_play = PowerPlay(video_file, debug=0, detect_circle=find_circle, continous_mode=1)
+        power_play.loop_vid_frames(sampling_rate=10)
+
 
 if __name__ == "__main__":
     #Test.test_ring_detection()
-    Test.test_power_play("py_images\\1.MOV", find_circle=0)
-    Test.test_power_play("py_images\\2.MOV", find_circle=1)
+    #Test.test_power_play_image("py_images\\1.MOV", find_circle=0)
+    #Test.test_power_play_image("py_images\\2.MOV", find_circle=1)
+    Test.test_power_play_tracking("py_images\\2.MOV", find_circle=1)
+    #Test.test_power_play_tracking("py_images\\1.MOV", find_circle=0)
+    #HSV_range_finder.do_work('output\\frame1.jpg')
 
