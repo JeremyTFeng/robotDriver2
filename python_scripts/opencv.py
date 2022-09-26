@@ -129,7 +129,9 @@ class Util:
             else:
                 assert(0)
     @staticmethod
-    def diplay_img_data(img):
+    def diplay_img_data(img, title=""):
+        if title is None:
+            title = ""
         drv = GoogleDrive()
         if(drv.isColabEnv()):
             cv2_imshow(img)
@@ -137,7 +139,7 @@ class Util:
             if (img.all() != None):
                 RGB_img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
                 plt.imshow(RGB_img)
-                #plt.title('ORIGINAL')
+                plt.title(title)
                 plt.show()
             else:
                 assert(0)
@@ -1280,11 +1282,17 @@ class PowerPlay:
             count += 1
         return mat
 
-    def processMat(self, mat):
-        #contour = ContourUtil.findMajorContours(t)
-        #Util.getEdges(t)
-        self.processContour(mat)
+    def processEdge(self, mask, img):
+        # Turning into Greyscale and Blurring to prepare for edge detection and contouring
+        #blurred = cv.cvtColor(mask, cv.COLOR_BGR2GRAY)
+        blurred = cv.GaussianBlur(mask, (5, 5), 0)
+        Util.diplay_img_data(blurred, 'blured')
 
+        # apply edge detection
+        edged = cv.Canny(blurred, 100,
+                         400)  # 2 threshold values have to be very high to ignore the gaps between rings, and irgnore other imperfections in the bg
+        Util.diplay_img_data(edged, 'edge')
+        return edged
     # mask in color range
     def findMask(self, img):
         #ORANGE_MIN = np.array([15, 50, 50], np.uint8)
@@ -1298,7 +1306,7 @@ class PowerPlay:
         blurred = cv.GaussianBlur(img, (11, 11), 0)
         hsv = cv.cvtColor(blurred, cv.COLOR_BGR2HSV)
         if self.debug_display != 0:
-            Util.diplay_img_data(hsv)
+            Util.diplay_img_data(hsv, 'hsv')
         if self.detect_circle !=0:
             mask = cv.inRange(hsv, GRAY_MIN, GRAY_MAX)
         else:
@@ -1306,7 +1314,7 @@ class PowerPlay:
         mask = cv.erode(mask, np.ones((2, 1)), iterations=1)
         mask = cv.dilate(mask, None, iterations=3)
         if self.debug_display != 0:
-            Util.diplay_img_data(mask)
+            Util.diplay_img_data(mask, 'mask')
         return mask
 
     # https://www.programcreek.com/python/example/77056/cv.minEnclosingCircle
@@ -1363,7 +1371,7 @@ class PowerPlay:
                     cv.drawContours(orig_img, [contour], 0, (0, 0, 255), 5)
         # displaying the image after drawing contours
         if self.debug_display == 1 or self.continous_mode == 1:
-            Util.diplay_img_data(orig_img)
+            Util.diplay_img_data(orig_img, 'contour')
         return circle_center
 class Test:
     @staticmethod
@@ -1383,10 +1391,11 @@ class Test:
         if find_circle is None:
             find_circle = 0
         power_play = PowerPlay(video_file, debug=1, detect_circle=find_circle)
-        mat = power_play.read_vid_sample(video_file, sampling_rate=100, index=3)
+        mat = power_play.read_vid_sample(video_file, sampling_rate=100, index=4)
         resized_mat = Util.resize(mat, 720)
         masked_mat = power_play.findMask(resized_mat)
         power_play.processContour(masked_mat, resized_mat)
+        power_play.processEdge(masked_mat, resized_mat)
 
     @staticmethod
     def test_power_play_tracking(video_file, find_circle=None):
@@ -1395,12 +1404,12 @@ class Test:
         power_play = PowerPlay(video_file, debug=0, detect_circle=find_circle, continous_mode=1)
         power_play.loop_vid_frames(sampling_rate=10)
 
-
 if __name__ == "__main__":
     #Test.test_ring_detection()
-    #Test.test_power_play_image("py_images\\1.MOV", find_circle=0)
+    Test.test_power_play_image("py_images\\1.MOV", find_circle=0)
     #Test.test_power_play_image("py_images\\2.MOV", find_circle=1)
-    Test.test_power_play_tracking("py_images\\2.MOV", find_circle=1)
+    #Test.test_power_play_tracking("py_images\\2.MOV", find_circle=1)
+    #Test.test_power_play_tracking("py_images\\3.MOV", find_circle=1)
     #Test.test_power_play_tracking("py_images\\1.MOV", find_circle=0)
     #HSV_range_finder.do_work('output\\frame1.jpg')
 
