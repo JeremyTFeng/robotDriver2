@@ -4,7 +4,9 @@
 	branch = master3
 [submodule "easy_opencv_lib"]
 	path = easy_opencv_lib
-	url = https://github.com/FTCclueless/EasyOpenCV.git
+	url = https://github.com/OpenFTC/EasyOpenCV.git
+	branch = master
 [submodule "OpenCV-Repackaged"]
 	path = OpenCV-Repackaged
 	url = https://github.com/OpenFTC/OpenCV-Repackaged.git
+	branch = master
