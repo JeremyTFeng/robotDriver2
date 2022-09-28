@@ -28,6 +28,7 @@ import java.util.List;
 //@Disabled
 public class SimpleDrive extends LinearOpMode {
     private String TAG = "SimpleDrive";
+    public static double DISTANCE = 72; // in
 
     public void runOpMode() throws InterruptedException {
         //SampleMecanumDrive drive = new SampleMecanumDrive(hardwareMap, this);
