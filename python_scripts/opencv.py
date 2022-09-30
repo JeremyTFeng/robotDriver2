@@ -1232,6 +1232,7 @@ class PowerPlay:
             self.continous_mode = 0
         else:
             self.continous_mode = continous_mode
+        self.video_output = None
 
     def process_img_object_tracking(self, img):
         resized_img = Util.resize(img, 720)
@@ -1242,7 +1243,10 @@ class PowerPlay:
 
     def loop_vid_frames(self, sampling_rate=None):
         if sampling_rate is None:
-            sampling_rate = 30
+            sampling_rate = 10
+        self.video_output = cv.VideoWriter(
+            "output\\output.avi", cv.VideoWriter_fourcc(*'MPEG'),
+            10, (720, 1280))
         vidcap = cv.VideoCapture(self.vid_file)
         height = vidcap.get(cv.CAP_PROP_FRAME_HEIGHT)  # always 0 in Linux python3
         width = vidcap.get(cv.CAP_PROP_FRAME_WIDTH)  # always 0 in Linux python3
@@ -1256,7 +1260,10 @@ class PowerPlay:
             if count % sampling_rate == 0:
                 self.process_img_object_tracking(image)
                 #time.sleep(2.0)
-
+        if self.video_output is None:
+            pass
+        else:
+            self.video_output.release()
 
     def read_vid_sample(self, vid_file, sampling_rate=None, index=None):  # read the video file, return one frame #index
         if sampling_rate is None:
@@ -1371,8 +1378,47 @@ class PowerPlay:
                     cv.drawContours(orig_img, [contour], 0, (0, 0, 255), 5)
         # displaying the image after drawing contours
         if self.debug_display == 1 or self.continous_mode == 1:
-            Util.diplay_img_data(orig_img, 'contour')
+            if self.video_output is None:
+                Util.diplay_img_data(orig_img, 'contour')
+        if self.video_output is None:
+            pass
+        else:
+            self.video_output.write(orig_img)
         return circle_center
+    @staticmethod
+    def playVideoFile(video_file):
+
+        # Create a VideoCapture object and read from input file
+        cap = cv.VideoCapture(video_file)
+
+        # Check if camera opened successfully
+        if (cap.isOpened() == False):
+            print("Error opening video file")
+
+        # Read until video is completed
+        while (cap.isOpened()):
+
+            # Capture frame-by-frame
+            ret, frame = cap.read()
+            if ret == True:
+                # Display the resulting frame
+                cv.imshow('Frame', frame)
+                time.sleep(1)
+                # Press Q on keyboard to exit
+                if cv.waitKey(25) & 0xFF == ord('q'):
+                    break
+
+            # Break the loop
+            else:
+                break
+
+        # When everything done, release
+        # the video capture object
+        cap.release()
+
+        # Closes all the frames
+        cv.destroyAllWindows()
+
 class Test:
     @staticmethod
     def test_colab():
@@ -1406,10 +1452,10 @@ class Test:
 
 if __name__ == "__main__":
     #Test.test_ring_detection()
-    Test.test_power_play_image("py_images\\1.MOV", find_circle=0)
+    #Test.test_power_play_image("py_images\\1.MOV", find_circle=0)
     #Test.test_power_play_image("py_images\\2.MOV", find_circle=1)
     #Test.test_power_play_tracking("py_images\\2.MOV", find_circle=1)
     #Test.test_power_play_tracking("py_images\\3.MOV", find_circle=1)
     #Test.test_power_play_tracking("py_images\\1.MOV", find_circle=0)
     #HSV_range_finder.do_work('output\\frame1.jpg')
-
+    PowerPlay.playVideoFile("output\\output.avi")
